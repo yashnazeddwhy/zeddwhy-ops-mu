@@ -1,0 +1,401 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>ZeddWhy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+:root{
+  --bg:#f2f5f4;--card:#ffffff;--ink:#14213d;--muted:#5d6b7a;--line:#d9e1e0;
+  --accent:#0e7c86;--accent-ink:#ffffff;--warn:#b7791f;--bad:#b3261e;--ok:#217a4b;
+  --head:#14213d;--head-ink:#f2f5f4;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){--bg:#0e1620;--card:#16212e;--ink:#e8eef2;--muted:#93a3b3;--line:#27384a;--accent:#3cb4bf;--accent-ink:#06222a;--head:#0a111a;--head-ink:#e8eef2;--warn:#e0a84a;--bad:#f08a82;--ok:#62c48e}
+}
+*{box-sizing:border-box}
+html{height:100%;scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;min-height:100%;background:var(--bg);color:var(--ink);font:16px/1.45 "Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;padding-top:env(safe-area-inset-top,0px);padding-bottom:calc(64px + env(safe-area-inset-bottom,0px))}
+h1,h2,h3,.brand{font-family:"Bricolage Grotesque","Source Sans 3",system-ui,sans-serif;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+input,select,textarea{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:8px;background:var(--card);font-size:16px}
+textarea{min-height:70px;resize:vertical}
+label{display:block;font-size:14px;color:var(--muted);margin:12px 0 4px}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn{border:0;border-radius:8px;padding:11px 16px;background:var(--accent);color:var(--accent-ink);font-weight:600;cursor:pointer}
+.btn.ghost{background:transparent;color:var(--ink);border:1px solid var(--line)}
+.btn.danger{background:transparent;color:var(--bad);border:1px solid var(--line)}
+.btn.small{padding:7px 11px;font-size:14px}
+.btn:disabled{opacity:.6}
+.top{background:var(--head);color:var(--head-ink);padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5}
+.brand{font-size:22px;font-weight:700;letter-spacing:.2px}
+.top .btn.ghost{color:var(--head-ink);border-color:rgba(255,255,255,.25)}
+main{max-width:760px;margin:0 auto;padding:16px}
+.row{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.head{margin-bottom:12px}
+.head h2{font-size:22px}
+.muted{color:var(--muted)}
+.pad{padding:24px 0;text-align:center}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:10px}
+.card.tap{cursor:pointer;width:100%;text-align:left;display:block}
+.item{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.item b{font-weight:600}
+.amt{font-weight:600;white-space:nowrap}
+.badge{display:inline-block;font-size:13px;padding:2px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted)}
+.badge.ok{color:var(--ok);border-color:var(--ok)}
+.badge.warn{color:var(--warn);border-color:var(--warn)}
+.sum{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.sum div{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.sum small{display:block;color:var(--muted);font-size:13px}
+.sum strong{font-size:19px;font-family:"Bricolage Grotesque",sans-serif}
+.monthbar{margin-bottom:12px}
+nav{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(4,1fr);padding-bottom:env(safe-area-inset-bottom,0px);z-index:5}
+nav button{background:none;border:0;padding:14px 4px;font-weight:600;color:var(--muted);border-top:3px solid transparent;cursor:pointer}
+nav button.on{color:var(--accent);border-top-color:var(--accent)}
+#sheet{position:fixed;inset:0;background:rgba(5,12,20,.55);display:none;align-items:flex-end;justify-content:center;z-index:20}
+#sheet.open{display:flex}
+#sheetBox{background:var(--bg);width:100%;max-width:640px;max-height:92%;overflow:auto;border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom,0px))}
+#sheetBox h3{font-size:20px;margin-bottom:4px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+.actions .btn{flex:1}
+.net{display:flex;justify-content:space-between;align-items:baseline;border-top:2px solid var(--ink);margin-top:16px;padding-top:10px;font-family:"Bricolage Grotesque",sans-serif;font-size:22px}
+#toast{position:fixed;left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;display:none;z-index:30;max-width:90%;text-align:center}
+#toast.bad{background:var(--bad);color:#fff}
+.login{max-width:380px;margin:12vh auto 0;padding:0 16px}
+.login h1{font-size:34px;margin-bottom:4px}
+.err{color:var(--bad);margin-top:10px}
+.note{font-size:14px;color:var(--muted);margin-top:10px}
+@media (prefers-reduced-motion:no-preference){#sheetBox{animation:up .18s ease-out}@keyframes up{from{transform:translateY(24px);opacity:.6}to{transform:none;opacity:1}}}
+</style>
+</head>
+<body>
+
+<div id="loginView" style="display:none"></div>
+
+<div id="appView" style="display:none">
+  <div class="top">
+    <div class="brand">ZeddWhy</div>
+    <div class="row" style="gap:8px">
+      <button class="btn ghost small" onclick="openSettings()">Rates</button>
+      <button class="btn ghost small" onclick="signOut()">Sign out</button>
+    </div>
+  </div>
+  <main id="view"></main>
+  <nav id="nav">
+    <button data-t="agents" onclick="go('agents')">Agents</button>
+    <button data-t="sales" onclick="go('sales')">Sales</button>
+    <button data-t="payslips" onclick="go('payslips')">Payslips</button>
+    <button data-t="documents" onclick="go('documents')">Documents</button>
+  </nav>
+</div>
+
+<div id="sheet" onclick="if(event.target===this)closeSheet()"><div id="sheetBox"></div></div>
+<div id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://rlmoelaxhngmjhdpqvkk.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_m4mzm52XR7JHbkVlf2PXrQ_jNP9whyT';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ---------- helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
+const r2 = n => Math.round(num(n) * 100) / 100;
+const rs = n => 'Rs ' + num(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+const fdate = d => d ? new Date(d + (String(d).length === 10 ? 'T00:00:00' : '')).toLocaleDateString('en-GB', {day:'numeric', month:'short', year:'numeric'}) : '';
+const monthStart = m => m + '-01';
+const nextMonthStart = m => { const [y, mo] = m.split('-').map(Number); return new Date(Date.UTC(y, mo, 1)).toISOString().slice(0, 10); };
+const monthLabel = m => new Date(m + '-01T00:00:00').toLocaleDateString('en-GB', {month:'long', year:'numeric'});
+
+let toastTimer;
+function toast(msg, bad) {
+  const t = $('#toast'); t.textContent = msg; t.className = bad ? 'bad' : ''; t.style.display = 'block';
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => t.style.display = 'none', bad ? 5000 : 2200);
+}
+function openSheet(html) { $('#sheetBox').innerHTML = html; $('#sheet').classList.add('open'); }
+function closeSheet() { $('#sheet').classList.remove('open'); }
+
+/* ---------- statutory rates (editable in the Rates screen; check with MRA) ---------- */
+const DEFAULT_RATES = { csgLow: 1.5, csgHigh: 3, csgThreshold: 50000, nsfRate: 1, nsfCap: 29710 };
+function loadRates() { try { return {...DEFAULT_RATES, ...JSON.parse(localStorage.getItem('zw_rates') || '{}')}; } catch (e) { return {...DEFAULT_RATES}; } }
+let RATES = loadRates();
+function statutory(gross) {
+  const csg = gross >= RATES.csgThreshold ? gross * RATES.csgHigh / 100 : gross * RATES.csgLow / 100;
+  const nsf = Math.min(gross, RATES.nsfCap) * RATES.nsfRate / 100;
+  return { csg: r2(csg), nsf: r2(nsf) };
+}
+function openSettings() {
+  openSheet(`<h3>Statutory rates</h3>
+  <p class="note">Used to pre-fill CSG and NSF on payslips. Check them against the MRA website before paying anyone. They are saved on this device only, so your partner sets them on theirs.</p>
+  <form onsubmit="saveRates(event)">
+    <div class="two"><div><label>CSG % below threshold</label><input name="csgLow" type="number" step="0.01" value="${RATES.csgLow}"></div>
+    <div><label>CSG % at or above</label><input name="csgHigh" type="number" step="0.01" value="${RATES.csgHigh}"></div></div>
+    <label>CSG threshold (Rs per month)</label><input name="csgThreshold" type="number" step="1" value="${RATES.csgThreshold}">
+    <div class="two"><div><label>NSF %</label><input name="nsfRate" type="number" step="0.01" value="${RATES.nsfRate}"></div>
+    <div><label>NSF wage ceiling (Rs)</label><input name="nsfCap" type="number" step="1" value="${RATES.nsfCap}"></div></div>
+    <p class="note">PAYE is entered by hand on each payslip, because it depends on each person's declared reliefs.</p>
+    <div class="actions"><button type="button" class="btn ghost" onclick="closeSheet()">Cancel</button><button class="btn">Save rates</button></div>
+  </form>`);
+}
+function saveRates(e) {
+  e.preventDefault(); const f = new FormData(e.target);
+  RATES = { csgLow: num(f.get('csgLow')), csgHigh: num(f.get('csgHigh')), csgThreshold: num(f.get('csgThreshold')), nsfRate: num(f.get('nsfRate')), nsfCap: num(f.get('nsfCap')) };
+  try { localStorage.setItem('zw_rates', JSON.stringify(RATES)); } catch (err) {}
+  closeSheet(); toast('Rates saved');
+}
+
+/* ---------- state ---------- */
+const S = { tab: 'agents', month: new Date().toISOString().slice(0, 7), agents: [], sales: [], payslips: [], docs: [], docAgent: '' };
+const agentName = id => (S.agents.find(a => a.id === id) || {}).full_name || 'No agent';
+
+async function loadAgents() {
+  const { data, error } = await db.from('agents').select('*').order('full_name');
+  if (error) return toast(error.message, true); S.agents = data;
+}
+async function loadMonth() {
+  const a = await db.from('sales').select('*').gte('sale_date', monthStart(S.month)).lt('sale_date', nextMonthStart(S.month)).order('sale_date', { ascending: false });
+  const b = await db.from('payslips').select('*').eq('month', monthStart(S.month));
+  if (a.error || b.error) return toast((a.error || b.error).message, true);
+  S.sales = a.data; S.payslips = b.data;
+}
+async function loadDocs() {
+  let q = db.from('documents').select('*').order('created_at', { ascending: false });
+  if (S.docAgent) q = q.eq('agent_id', S.docAgent);
+  const { data, error } = await q;
+  if (error) return toast(error.message, true); S.docs = data;
+}
+const commissionFor = id => r2(S.sales.filter(s => s.agent_id === id).reduce((t, s) => t + num(s.commission_amount), 0));
+
+/* ---------- navigation ---------- */
+async function go(t) {
+  S.tab = t;
+  document.querySelectorAll('#nav button').forEach(b => b.classList.toggle('on', b.dataset.t === t));
+  $('#view').innerHTML = '<p class="muted pad">Loading…</p>';
+  await loadAgents();
+  if (['agents', 'sales', 'payslips'].includes(t)) await loadMonth();
+  if (t === 'documents') await loadDocs();
+  renderView();
+}
+function setMonth(v) { if (v) { S.month = v; go(S.tab); } }
+function renderView() {
+  const v = { agents: viewAgents, sales: viewSales, payslips: viewPayslips, documents: viewDocs }[S.tab];
+  $('#view').innerHTML = v();
+}
+const monthBar = () => `<div class="monthbar"><label style="margin-top:0">Month</label><input type="month" value="${S.month}" onchange="setMonth(this.value)"></div>`;
+
+/* ---------- agents ---------- */
+function viewAgents() {
+  const total = S.agents.filter(a => a.status === 'active').length;
+  return `<div class="row head"><h2>Agents</h2><button class="btn" onclick="agentForm('')">Add agent</button></div>
+  ${monthBar()}
+  <div class="sum"><div><small>Active agents</small><strong>${total}</strong></div><div><small>Commission in ${esc(monthLabel(S.month))}</small><strong>${rs(S.sales.reduce((t, s) => t + num(s.commission_amount), 0))}</strong></div></div>
+  ${S.agents.length ? S.agents.map(a => `<button class="card tap" onclick="agentForm('${a.id}')">
+    <div class="item"><div><b>${esc(a.full_name)}</b><br><span class="muted">${esc(a.phone || 'No phone')} · ${num(a.commission_rate)}% commission</span></div>
+    <div style="text-align:right"><span class="badge ${a.status === 'active' ? 'ok' : ''}">${esc(a.status)}</span><br><span class="amt">${rs(commissionFor(a.id))}</span></div></div></button>`).join('')
+  : '<p class="muted pad">No agents yet. Add your first agent to start recording sales.</p>'}`;
+}
+function agentForm(id) {
+  const a = S.agents.find(x => x.id === id) || { status: 'active', commission_rate: 0 };
+  const f = (n, l, t = 'text') => `<label>${l}</label><input name="${n}" type="${t}" value="${esc(a[n] ?? '')}">`;
+  openSheet(`<h3>${id ? 'Edit agent' : 'New agent'}</h3>
+  <form onsubmit="saveAgent(event,'${id}')">
+    ${f('full_name', 'Full name')}
+    <div class="two"><div>${f('nic', 'NIC number')}</div><div>${f('phone', 'Phone', 'tel')}</div></div>
+    ${f('email', 'Email', 'email')}${f('address', 'Address')}
+    <div class="two"><div>${f('start_date', 'Start date', 'date')}</div>
+    <div><label>Status</label><select name="status"><option value="active" ${a.status === 'active' ? 'selected' : ''}>Active</option><option value="inactive" ${a.status === 'inactive' ? 'selected' : ''}>Inactive</option></select></div></div>
+    <div class="two"><div>${f('bank_name', 'Bank')}</div><div>${f('bank_account', 'Account number')}</div></div>
+    <label>Commission rate (%)</label><input name="commission_rate" type="number" step="0.01" min="0" value="${num(a.commission_rate)}">
+    <label>Notes</label><textarea name="notes">${esc(a.notes ?? '')}</textarea>
+    <div class="actions">${id ? `<button type="button" class="btn danger" onclick="delAgent('${id}')">Delete</button>` : ''}<button type="button" class="btn ghost" onclick="closeSheet()">Cancel</button><button class="btn">Save agent</button></div>
+  </form>`);
+  document.querySelector('#sheetBox [name=full_name]').required = true;
+}
+async function saveAgent(e, id) {
+  e.preventDefault(); const o = {};
+  for (const [k, v] of new FormData(e.target).entries()) o[k] = String(v).trim() === '' ? null : String(v).trim();
+  o.commission_rate = num(o.commission_rate); if (!o.status) o.status = 'active';
+  const r = id ? await db.from('agents').update(o).eq('id', id) : await db.from('agents').insert(o);
+  if (r.error) return toast(r.error.message, true);
+  closeSheet(); toast('Agent saved'); go('agents');
+}
+async function delAgent(id) {
+  if (!confirm('Delete this agent and all their sales and payslips? Uploaded documents stay but lose their agent link.')) return;
+  const r = await db.from('agents').delete().eq('id', id);
+  if (r.error) return toast(r.error.message, true);
+  closeSheet(); toast('Agent deleted'); go('agents');
+}
+
+/* ---------- sales ---------- */
+function viewSales() {
+  const tot = S.sales.reduce((t, s) => t + num(s.sale_amount), 0), com = S.sales.reduce((t, s) => t + num(s.commission_amount), 0);
+  return `<div class="row head"><h2>Sales</h2><button class="btn" onclick="saleForm()">Record sale</button></div>
+  ${monthBar()}
+  <div class="sum"><div><small>Total sales</small><strong>${rs(tot)}</strong></div><div><small>Total commission</small><strong>${rs(com)}</strong></div></div>
+  ${S.sales.length ? S.sales.map(s => `<div class="card"><div class="item"><div><b>${esc(agentName(s.agent_id))}</b><br><span class="muted">${fdate(s.sale_date)}${s.description ? ' · ' + esc(s.description) : ''}</span></div>
+    <div style="text-align:right"><span class="amt">${rs(s.sale_amount)}</span><br><span class="muted">${rs(s.commission_amount)} at ${num(s.commission_rate)}%</span></div></div>
+    <div style="text-align:right;margin-top:6px"><button class="btn danger small" onclick="delSale('${s.id}')">Delete</button></div></div>`).join('')
+  : `<p class="muted pad">No sales recorded for ${esc(monthLabel(S.month))}.</p>`}`;
+}
+function saleForm() {
+  const act = S.agents.filter(a => a.status === 'active');
+  if (!act.length) return toast('Add an active agent first', true);
+  const today = new Date().toISOString().slice(0, 10);
+  openSheet(`<h3>Record sale</h3>
+  <form onsubmit="saveSale(event)">
+    <label>Agent</label><select name="agent_id" onchange="salePick()" required>${act.map(a => `<option value="${a.id}" data-rate="${num(a.commission_rate)}">${esc(a.full_name)}</option>`).join('')}</select>
+    <div class="two"><div><label>Date</label><input name="sale_date" type="date" value="${today}" required></div>
+    <div><label>Sale amount (Rs)</label><input name="sale_amount" type="number" step="0.01" min="0" inputmode="decimal" oninput="saleCalc()" required></div></div>
+    <div class="two"><div><label>Commission rate (%)</label><input name="commission_rate" type="number" step="0.01" min="0" value="${num(act[0].commission_rate)}" oninput="saleCalc()" required></div>
+    <div><label>Commission</label><input id="saleCom" value="Rs 0.00" readonly></div></div>
+    <label>Description</label><input name="description">
+    <label>Notes</label><textarea name="notes"></textarea>
+    <div class="actions"><button type="button" class="btn ghost" onclick="closeSheet()">Cancel</button><button class="btn">Save sale</button></div>
+  </form>`);
+}
+function salePick() { const s = document.querySelector('#sheetBox [name=agent_id]'); document.querySelector('#sheetBox [name=commission_rate]').value = s.selectedOptions[0].dataset.rate; saleCalc(); }
+function saleCalc() { const q = n => num(document.querySelector('#sheetBox [name=' + n + ']').value); $('#saleCom').value = rs(q('sale_amount') * q('commission_rate') / 100); }
+async function saveSale(e) {
+  e.preventDefault(); const f = new FormData(e.target);
+  const row = { agent_id: f.get('agent_id'), sale_date: f.get('sale_date'), sale_amount: num(f.get('sale_amount')), commission_rate: num(f.get('commission_rate')), description: f.get('description') || null, notes: f.get('notes') || null };
+  const r = await db.from('sales').insert(row);
+  if (r.error) return toast(r.error.message, true);
+  closeSheet(); toast('Sale saved');
+  const m = row.sale_date.slice(0, 7); if (m !== S.month) S.month = m; go('sales');
+}
+async function delSale(id) {
+  if (!confirm('Delete this sale?')) return;
+  const r = await db.from('sales').delete().eq('id', id);
+  if (r.error) return toast(r.error.message, true); toast('Sale deleted'); go('sales');
+}
+
+/* ---------- payslips ---------- */
+function viewPayslips() {
+  const act = S.agents.filter(a => a.status === 'active' || S.payslips.some(p => p.agent_id === a.id));
+  return `<div class="row head"><h2>Payslips</h2></div>${monthBar()}
+  ${act.length ? act.map(a => { const p = S.payslips.find(x => x.agent_id === a.id);
+    return `<button class="card tap" onclick="payslipForm('${a.id}')"><div class="item"><div><b>${esc(a.full_name)}</b><br><span class="muted">Commission ${rs(commissionFor(a.id))}</span></div>
+    <div style="text-align:right">${p ? `<span class="badge ${p.status === 'paid' ? 'ok' : 'warn'}">${esc(p.status)}</span><br><span class="amt">${rs(p.net_pay)}</span>` : '<span class="badge">not made</span>'}</div></div></button>`; }).join('')
+  : '<p class="muted pad">Add agents and record sales to create payslips.</p>'}`;
+}
+function payslipForm(agentId) {
+  const a = S.agents.find(x => x.id === agentId), p = S.payslips.find(x => x.agent_id === agentId);
+  const sales = commissionFor(agentId), comm = p ? num(p.total_commission) : sales;
+  const st = p ? { csg: num(p.csg), nsf: num(p.nsf) } : statutory(comm);
+  S.ps = { agentId, sales };
+  const inp = (id, l, v, ev = 'psNet()') => `<div><label>${l}</label><input id="${id}" type="number" step="0.01" min="0" inputmode="decimal" value="${v}" oninput="${ev}"></div>`;
+  openSheet(`<h3>${esc(a.full_name)}</h3><p class="muted" style="margin:0">${esc(monthLabel(S.month))}</p>
+  <p class="note">Commission from recorded sales: ${rs(sales)} <a href="#" onclick="psReset();return false" style="color:var(--accent)">use this</a></p>
+  <div class="two">${inp('ps_comm', 'Total commission', comm, 'psRecalc()')}${inp('ps_paye', 'PAYE', p ? num(p.paye) : 0)}</div>
+  <div class="two">${inp('ps_csg', 'CSG', st.csg)}${inp('ps_nsf', 'NSF', st.nsf)}</div>
+  ${inp('ps_other', 'Other deductions', p ? num(p.other_deductions) : 0)}
+  <label>Status</label><select id="ps_status"><option value="draft" ${!p || p.status === 'draft' ? 'selected' : ''}>Draft</option><option value="paid" ${p && p.status === 'paid' ? 'selected' : ''}>Paid</option></select>
+  <label>Notes</label><textarea id="ps_notes">${esc(p ? p.notes || '' : '')}</textarea>
+  <div class="net"><span>Net pay</span><span id="ps_net"></span></div>
+  <div class="actions"><button class="btn ghost" onclick="closeSheet()">Cancel</button><button class="btn ghost" onclick="printPayslip()">Print</button><button class="btn" onclick="savePayslip()">Save payslip</button></div>`);
+  psNet();
+}
+const pv = id => num($('#' + id).value);
+function psRecalc() { const s = statutory(pv('ps_comm')); $('#ps_csg').value = s.csg; $('#ps_nsf').value = s.nsf; psNet(); }
+function psReset() { $('#ps_comm').value = S.ps.sales; psRecalc(); }
+function psNet() { const n = r2(pv('ps_comm') - pv('ps_csg') - pv('ps_nsf') - pv('ps_paye') - pv('ps_other')); $('#ps_net').textContent = rs(n); return n; }
+function psRow() {
+  return { agent_id: S.ps.agentId, month: monthStart(S.month), total_commission: pv('ps_comm'), csg: pv('ps_csg'), nsf: pv('ps_nsf'), paye: pv('ps_paye'), other_deductions: pv('ps_other'), net_pay: psNet(), status: $('#ps_status').value, notes: $('#ps_notes').value.trim() || null };
+}
+async function savePayslip() {
+  const r = await db.from('payslips').upsert(psRow(), { onConflict: 'agent_id,month' });
+  if (r.error) return toast(r.error.message, true);
+  closeSheet(); toast('Payslip saved'); go('payslips');
+}
+function printPayslip() {
+  const r = psRow(), a = S.agents.find(x => x.id === r.agent_id);
+  const line = (l, v) => `<tr><td>${l}</td><td style="text-align:right">${rs(v)}</td></tr>`;
+  const w = window.open('', '_blank'); if (!w) return toast('Allow pop-ups to print', true);
+  w.document.write(`<!doctype html><title>Payslip</title><body style="font-family:Arial,sans-serif;max-width:560px;margin:30px auto;color:#111">
+  <h2 style="margin:0">ZeddWhy Interactive LTD</h2><p style="margin:2px 0 18px;color:#555">Payslip for ${esc(monthLabel(S.month))}</p>
+  <p><b>${esc(a.full_name)}</b><br>NIC: ${esc(a.nic || '-')}<br>Bank: ${esc(a.bank_name || '-')} ${esc(a.bank_account || '')}</p>
+  <table style="width:100%;border-collapse:collapse" cellpadding="8" border="1">
+  ${line('Commission earned', r.total_commission)}${line('CSG', r.csg)}${line('NSF', r.nsf)}${line('PAYE', r.paye)}${line('Other deductions', r.other_deductions)}
+  <tr style="background:#eee"><td><b>Net pay</b></td><td style="text-align:right"><b>${rs(r.net_pay)}</b></td></tr></table>
+  ${r.notes ? `<p>Notes: ${esc(r.notes)}</p>` : ''}<script>window.onload=()=>window.print()<\/script></body>`);
+  w.document.close();
+}
+
+/* ---------- documents ---------- */
+const DOC_TYPES = ['ID copy', 'Contract', 'Bank details', 'Payslip', 'Invoice', 'Other'];
+function viewDocs() {
+  return `<div class="row head"><h2>Documents</h2><button class="btn" onclick="docForm()">Upload</button></div>
+  <label style="margin-top:0">Show documents for</label>
+  <select onchange="S.docAgent=this.value;go('documents')" style="margin-bottom:12px"><option value="">Everyone</option>${S.agents.map(a => `<option value="${a.id}" ${S.docAgent === a.id ? 'selected' : ''}>${esc(a.full_name)}</option>`).join('')}</select>
+  ${S.docs.length ? S.docs.map(d => `<div class="card"><div class="item"><div><b>${esc(d.file_name)}</b><br><span class="muted">${esc(d.doc_type || 'Other')} · ${esc(agentName(d.agent_id))} · ${fdate(d.created_at.slice(0, 10))}</span></div></div>
+    <div class="actions" style="margin-top:10px"><button class="btn ghost small" onclick="openDoc('${d.id}')">Open</button><button class="btn danger small" onclick="delDoc('${d.id}')">Delete</button></div></div>`).join('')
+  : '<p class="muted pad">No documents yet. Upload contracts, ID copies or bank details.</p>'}`;
+}
+function docForm() {
+  openSheet(`<h3>Upload document</h3>
+  <form onsubmit="uploadDoc(event)">
+    <label>Agent</label><select name="agent_id"><option value="">General (no agent)</option>${S.agents.map(a => `<option value="${a.id}" ${S.docAgent === a.id ? 'selected' : ''}>${esc(a.full_name)}</option>`).join('')}</select>
+    <label>Type</label><select name="doc_type">${DOC_TYPES.map(t => `<option>${t}</option>`).join('')}</select>
+    <label>File</label><input name="file" type="file" required>
+    <div class="actions"><button type="button" class="btn ghost" onclick="closeSheet()">Cancel</button><button class="btn" id="upBtn">Upload</button></div>
+  </form>`);
+}
+async function uploadDoc(e) {
+  e.preventDefault(); const f = e.target, file = f.file.files[0]; if (!file) return;
+  const agent = f.agent_id.value || null, btn = $('#upBtn'); btn.disabled = true; btn.textContent = 'Uploading…';
+  const path = `${agent || 'general'}/${Date.now()}-${file.name.replace(/[^\w.\-]+/g, '_')}`;
+  const up = await db.storage.from('documents').upload(path, file, { contentType: file.type || undefined });
+  if (up.error) { btn.disabled = false; btn.textContent = 'Upload'; return toast(up.error.message, true); }
+  const ins = await db.from('documents').insert({ agent_id: agent, doc_type: f.doc_type.value, file_name: file.name, file_path: path });
+  if (ins.error) { await db.storage.from('documents').remove([path]); btn.disabled = false; btn.textContent = 'Upload'; return toast(ins.error.message, true); }
+  closeSheet(); toast('Document uploaded'); go('documents');
+}
+async function openDoc(id) {
+  const d = S.docs.find(x => x.id === id), w = window.open('', '_blank');
+  const { data, error } = await db.storage.from('documents').createSignedUrl(d.file_path, 120);
+  if (error) { if (w) w.close(); return toast(error.message, true); }
+  if (w) w.location = data.signedUrl; else location.href = data.signedUrl;
+}
+async function delDoc(id) {
+  if (!confirm('Delete this document permanently?')) return;
+  const d = S.docs.find(x => x.id === id);
+  await db.storage.from('documents').remove([d.file_path]);
+  const r = await db.from('documents').delete().eq('id', id);
+  if (r.error) return toast(r.error.message, true); toast('Document deleted'); go('documents');
+}
+
+/* ---------- auth ---------- */
+function showLogin(msg) {
+  $('#appView').style.display = 'none'; const l = $('#loginView'); l.style.display = 'block';
+  l.innerHTML = `<div class="login"><h1 class="brand">ZeddWhy</h1><p class="muted" style="margin-top:0">Sign in to manage agents, sales, payslips and documents.</p>
+  <form onsubmit="signIn(event)"><label>Email</label><input name="email" type="email" autocomplete="username" required>
+  <label>Password</label><input name="password" type="password" autocomplete="current-password" required>
+  <div class="actions"><button class="btn" id="loginBtn">Sign in</button></div><div class="err" id="loginErr">${esc(msg || '')}</div></form></div>`;
+}
+async function signIn(e) {
+  e.preventDefault(); const f = new FormData(e.target), b = $('#loginBtn'); b.disabled = true;
+  const { error } = await db.auth.signInWithPassword({ email: f.get('email').trim(), password: f.get('password') });
+  b.disabled = false;
+  if (error) { $('#loginErr').textContent = error.message; return; }
+  boot();
+}
+async function signOut() { await db.auth.signOut(); showLogin(); }
+async function boot() {
+  const { data: { session } } = await db.auth.getSession();
+  if (!session) return showLogin();
+  const { data, error } = await db.from('admins').select('user_id').eq('user_id', session.user.id);
+  if (error || !data || !data.length) { await db.auth.signOut(); return showLogin('This account does not have access. Ask the other admin to add it.'); }
+  $('#loginView').style.display = 'none'; $('#appView').style.display = 'block';
+  go('agents');
+}
+boot();
+</script>
+</body>
+</html>
