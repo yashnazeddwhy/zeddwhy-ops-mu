@@ -255,7 +255,12 @@ const minsBetween = (a, b) => { if (!a || !b) return 0; const p = t => { const [
 const sum = (arr, k) => r2(arr.reduce((t, x) => t + num(x[k]), 0));
 const initials = n => String(n || '?').trim().split(/\s+/).slice(0, 2).map(w => w[0]).join('').toUpperCase();
 const lab = s => String(s || '').replace('_', ' ').replace(/^./, c => c.toUpperCase());
-const STATUS_CLS = { approved:'ok', pending:'warn', rejected:'bad', present:'ok', late:'warn', half_day:'warn', absent:'bad', active:'ok', inactive:'mute', paid:'ok', draft:'warn', expired:'bad', expiring:'warn', terminated:'mute', leave:'info', sickness:'bad', unmarked:'mute' };
+const WORK_DAYS = [1, 2, 3, 4, 5]; // Monday to Friday; Saturday and Sunday are days off
+const dow = d => new Date(d + 'T00:00:00').getDay();
+const isOff = d => !WORK_DAYS.includes(dow(d));
+const dayName = d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long' });
+const statLabel = k => k === 'unmarked' ? 'Not marked' : k === 'dayoff' ? 'Day off' : k === 'leave' ? 'On leave' : k === 'sickness' ? 'Sick' : k;
+const STATUS_CLS = { dayoff:'mute', approved:'ok', pending:'warn', rejected:'bad', present:'ok', late:'warn', half_day:'warn', absent:'bad', active:'ok', inactive:'mute', paid:'ok', draft:'warn', expired:'bad', expiring:'warn', terminated:'mute', leave:'info', sickness:'bad', unmarked:'mute' };
 const badge = (t, k) => `<span class="badge b-${STATUS_CLS[k || t] || 'mute'}">${esc(lab(t))}</span>`;
 const agentName = id => (S.agents.find(a => a.id === id) || {}).full_name || 'No agent';
 const dispName = () => { try { return localStorage.getItem('zw_name') || ''; } catch (e) { return ''; } };
@@ -369,13 +374,13 @@ function vDashboard() {
   const onKind = k => new Set(S.abs.filter(x => x.kind === k && x.status === 'approved' && x.start_date <= t && x.end_date >= t).map(x => x.agent_id)).size;
   const stat = (v, icon, label, num_) => { const m = modOf(v); return `<button class="stat" onclick="go('${v}')"><span class="ico" style="--tb:${m.tb};--tc:${m.tc}">${ic(icon)}</span><span class="num">${num_}</span><small>${label}</small></button>`; };
   const upcoming = S.abs.filter(x => x.kind === 'leave' && x.status !== 'rejected').slice(0, 4);
-  const attRows = act.slice(0, 7).map(a => { const r = attToday.find(x => x.agent_id === a.id); const k = r ? r.status : (absKind(a.id, t) || 'unmarked'); return `<div class="item"><div class="ava">${esc(initials(a.full_name))}</div><div class="grow"><b>${esc(a.full_name)}</b></div>${r && r.time_in ? `<span class="sub">${esc(r.time_in.slice(0, 5))}</span>` : ''}${badge(k === 'unmarked' ? 'Not marked' : k, k)}</div>`; }).join('');
+  const attRows = act.slice(0, 7).map(a => { const r = attToday.find(x => x.agent_id === a.id); const k = r ? r.status : (absKind(a.id, t) || (isOff(t) ? 'dayoff' : 'unmarked')); return `<div class="item"><div class="ava">${esc(initials(a.full_name))}</div><div class="grow"><b>${esc(a.full_name)}</b></div>${r && r.time_in ? `<span class="sub">${esc(r.time_in.slice(0, 5))}</span>` : ''}${badge(statLabel(k), k)}</div>`; }).join('');
   const qa = [
     ['userplus', 'Add agent', "agentForm('')", 'agents'], ['dollar', 'Run payroll', "go('payroll')", 'payroll'], ['calendar', 'Mark attendance', "go('attendance')", 'attendance'],
     ['plane', 'Request leave', "absForm('leave','')", 'leave'], ['upload', 'Upload document', 'docForm()', 'documents'], ['file', 'Create contract', "contractForm('')", 'contracts']
   ].map(([i, l, f, m]) => { const md = modOf(m); return `<button style="--tb:${md.tb};--tc:${md.tc}" onclick="${f}">${ic(i, 24)}<span>${l}</span></button>`; }).join('');
   const name = dispName();
-  return `<div class="only-m"><div class="hello">Hello${name ? ', ' + esc(name) : ''} 👋</div><p class="muted" style="margin:0 0 14px">Here's what's happening today</p></div>
+  return `<div class="only-m"><div class="hello">Hello${name ? ', ' + esc(name) : ''} 👋</div><p class="muted" style="margin:0 0 14px">${isOff(t) ? 'Today is a day off (' + dayName(t) + ')' : "Here's what's happening today"}</p></div>
   <div class="only-d pagehead"><div><h2>Dashboard</h2><p>Overview of your company</p></div></div>
   <div class="stats">${stat('agents', 'users', 'Active agents', act.length)}${stat('attendance', 'calendar', 'Present today', present)}${stat('leave', 'plane', 'On leave', onKind('leave'))}${stat('sickness', 'heart', 'On sickness', onKind('sickness'))}</div>
   <div class="strip"><div><small>Sales in ${esc(monthLabel(S.month))}</small><strong>${rs(sum(S.sales, 'sale_amount'))}</strong></div><div><small>Commission</small><strong>${rs(sum(S.sales, 'commission_amount'))}</strong></div><div class="only-d"><small>Payslips paid</small><strong>${S.payslips.filter(p => p.status === 'paid').length} of ${act.length}</strong></div></div>
@@ -526,14 +531,14 @@ function printPayslip() {
 /* ---------- attendance ---------- */
 const absKind = (id, day) => { const x = S.abs.find(a => a.agent_id === id && a.start_date <= day && a.end_date >= day); return x ? x.kind : null; };
 function vAttendance() {
-  const day = S.day;
+  const day = S.day, off = isOff(day);
   const rows = S.agents.filter(a => a.status === 'active' && match(a.full_name)).map(a => ({ a, r: S.att.find(x => x.agent_id === a.id && x.work_date === day), k: absKind(a.id, day) }));
-  const c = s => rows.filter(x => x.r && x.r.status === s).length, un = rows.filter(x => !x.r && !x.k).length;
-  return `${pageHead('Attendance', `<button class="btn" onclick="markAllPresent()">Mark all present</button>`, esc(fdate(day)))}
+  const c = s => rows.filter(x => x.r && x.r.status === s).length, un = rows.filter(x => !x.r && !x.k && !off).length;
+  return `${pageHead('Attendance', `<button class="btn" onclick="markAllPresent()">Mark all present</button>`, esc(fdate(day)) + (off ? ' · ' + dayName(day) + ': day off' : ''))}
   <div class="row" style="margin-bottom:12px;align-items:flex-end;justify-content:flex-start"><div class="filter" style="width:200px"><label>Date</label><input type="date" value="${day}" onchange="setDay(this.value)"></div><button class="btn ghost" onclick="setDay('${today()}')">Today</button></div>
   <div class="sum"><div><small>Present</small><strong>${c('present') + c('late') + c('half_day')}</strong></div><div><small>Absent · Not marked</small><strong>${c('absent')} · ${un}</strong></div></div>
-  ${rows.length ? rows.map(({ a, r, k }) => { const st = r ? r.status : (k || 'unmarked'); const times = r && (r.time_in || r.time_out) ? `${(r.time_in || '').slice(0, 5) || '--'} – ${(r.time_out || '').slice(0, 5) || '--'}` : '';
-    return `<button class="card" onclick="attForm('${a.id}')"><div class="item" style="padding:0;border:0"><div class="ava">${esc(initials(a.full_name))}</div><div class="grow"><b>${esc(a.full_name)}</b><span class="sub">${times || (k ? (k === 'leave' ? 'Approved leave' : 'Approved sickness') : 'Tap to mark')}</span></div>${badge(st === 'unmarked' ? 'Not marked' : st === 'leave' ? 'On leave' : st === 'sickness' ? 'Sick' : st, st)}</div></button>`; }).join('')
+  ${rows.length ? rows.map(({ a, r, k }) => { const st = r ? r.status : (k || (off ? 'dayoff' : 'unmarked')); const times = r && (r.time_in || r.time_out) ? `${(r.time_in || '').slice(0, 5) || '--'} – ${(r.time_out || '').slice(0, 5) || '--'}` : '';
+    return `<button class="card" onclick="attForm('${a.id}')"><div class="item" style="padding:0;border:0"><div class="ava">${esc(initials(a.full_name))}</div><div class="grow"><b>${esc(a.full_name)}</b><span class="sub">${times || (k ? (k === 'leave' ? 'Approved leave' : 'Approved sickness') : off ? 'Weekly day off' : 'Tap to mark')}</span></div>${badge(statLabel(st), st)}</div></button>`; }).join('')
   : '<p class="empty">No active agents to show.</p>'}`;
 }
 function attForm(agentId) {
@@ -555,6 +560,7 @@ async function saveAtt(e, agentId) {
 }
 async function delAtt(id) { const r = await db.from('attendance').delete().eq('id', id); if (r.error) return toast(r.error.message, true); closeSheet(); go('attendance', true); }
 async function markAllPresent() {
+  if (isOff(S.day)) return toast(dayName(S.day) + ' is a day off', true);
   const todo = S.agents.filter(a => a.status === 'active' && !S.att.some(x => x.agent_id === a.id && x.work_date === S.day) && !absKind(a.id, S.day)).map(a => ({ agent_id: a.id, work_date: S.day, status: 'present' }));
   if (!todo.length) return toast('Everyone is already marked');
   const r = await db.from('attendance').upsert(todo, { onConflict: 'agent_id,work_date', ignoreDuplicates: true });
