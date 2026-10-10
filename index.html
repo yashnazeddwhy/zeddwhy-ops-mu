@@ -299,7 +299,7 @@ function saveRates(e) {
 }
 
 /* ---------- state + loading ---------- */
-const S = { view: 'dashboard', q: '', month: today().slice(0, 7), day: today(), user: null, agents: [], sales: [], payslips: [], att: [], abs: [], docs: [], contracts: [], docAgent: '' };
+const S = { view: 'dashboard', q: '', month: today().slice(0, 7), day: today(), user: null, agents: [], sales: [], payslips: [], att: [], abs: [], docs: [], contracts: [], docAgent: '', folders: [], folder: '' };
 async function q(p) { const r = await p; if (r.error) { toast(r.error.message, true); return null; } return r.data; }
 const loadAgents = async () => { S.agents = await q(db.from('agents').select('*').order('full_name')) || []; };
 const loadMonth = async () => {
@@ -312,7 +312,10 @@ const loadAtt = async m => { S.att = await q(db.from('attendance').select('*').g
 const loadAbsMonth = async m => { S.abs = await q(db.from('absences').select('*').eq('status', 'approved').lte('start_date', lastDay(m)).gte('end_date', monthStart(m))) || []; };
 const loadAbsActive = async () => { S.abs = await q(db.from('absences').select('*').gte('end_date', today()).order('start_date')) || []; };
 const loadAbsKind = async k => { S.abs = await q(db.from('absences').select('*').eq('kind', k).order('start_date', { ascending: false }).limit(300)) || []; };
-const loadDocs = async () => { let r = db.from('documents').select('*').order('created_at', { ascending: false }).limit(300); if (S.docAgent) r = r.eq('agent_id', S.docAgent); S.docs = await q(r) || []; };
+const loadDocs = async () => {
+  const [d, f] = await Promise.all([q(db.from('documents').select('*').order('created_at', { ascending: false }).limit(500)), q(db.from('doc_folders').select('*').order('name'))]);
+  S.docs = d || []; S.folders = f || [];
+};
 const loadRecentDocs = async () => { S.docs = await q(db.from('documents').select('*').order('created_at', { ascending: false }).limit(3)) || []; };
 const loadContracts = async () => { S.contracts = await q(db.from('contracts').select('*').order('end_date', { ascending: true, nullsFirst: false }).limit(300)) || []; };
 
@@ -334,6 +337,7 @@ const VIEW = { dashboard: vDashboard, agents: vAgents, sales: vSales, payroll: v
 
 async function go(v, keepQ) {
   if (!keepQ) { S.q = ''; const qi = $('#q'); if (qi) qi.value = ''; }
+  if (!keepQ && v === 'documents') S.folder = '';
   S.view = v; closeSheet(); markNav();
   $('#view').innerHTML = '<p class="muted pad">Loading…</p>'; window.scrollTo(0, 0);
   try { await LOAD[v](); } catch (e) { toast(e.message, true); }
@@ -610,17 +614,68 @@ async function delAbs(id) { if (!confirm('Delete this record?')) return; const r
 
 /* ---------- documents ---------- */
 const DOC_TYPES = ['ID copy', 'Contract', 'Bank details', 'Payslip', 'Invoice', 'Other'];
+const folderName = id => (S.folders.find(f => f.id === id) || {}).name || '';
+function docCard(d, showFolder) {
+  const fn = folderName(d.folder_id);
+  return `<div class="card"><div class="item" style="padding:0;border:0"><span class="ico" style="--tb:#e4eefc;--tc:#2b66c9">${ic('file', 20)}</span><div class="grow"><b>${esc(d.file_name)}</b><span class="sub">${esc(d.doc_type || 'Other')} · ${esc(agentName(d.agent_id))} · ${fdate(d.created_at.slice(0, 10))}${showFolder && fn ? ' · ' + esc(fn) : ''}</span></div></div>
+    <div class="actions" style="margin-top:10px"><button class="btn ghost small" onclick="openFile('${d.file_path.replace(/'/g, "\\'")}')">Open</button><button class="btn ghost small" onclick="moveDoc('${d.id}')">Move</button><button class="btn danger small" onclick="delDoc('${d.id}')">Delete</button></div></div>`;
+}
 function vDocs() {
-  const list = S.docs.filter(d => match(d.file_name + ' ' + (d.doc_type || '') + ' ' + agentName(d.agent_id)));
-  return `${pageHead('Documents', plusBtn('Upload', 'docForm()'))}
-  <div class="filter" style="margin-bottom:12px;max-width:320px"><label>Show documents for</label><select onchange="S.docAgent=this.value;go('documents',true)"><option value="">Everyone</option>${S.agents.map(a => `<option value="${a.id}" ${S.docAgent === a.id ? 'selected' : ''}>${esc(a.full_name)}</option>`).join('')}</select></div>
-  ${list.length ? list.map(d => `<div class="card"><div class="item" style="padding:0;border:0"><span class="ico" style="--tb:#e4eefc;--tc:#2b66c9">${ic('file', 20)}</span><div class="grow"><b>${esc(d.file_name)}</b><span class="sub">${esc(d.doc_type || 'Other')} · ${esc(agentName(d.agent_id))} · ${fdate(d.created_at.slice(0, 10))}</span></div></div>
-    <div class="actions" style="margin-top:10px"><button class="btn ghost small" onclick="openFile('${d.file_path.replace(/'/g, "\\'")}')">Open</button><button class="btn danger small" onclick="delDoc('${d.id}')">Delete</button></div></div>`).join('')
-  : '<p class="empty">No documents yet. Upload contracts, ID copies or bank details.</p>'}`;
+  const known = new Set(S.folders.map(x => x.id));
+  if (S.folder && !known.has(S.folder)) S.folder = '';
+  const inF = S.folder, cur = S.folders.find(x => x.id === inF), searching = !!S.q;
+  const base = S.docs.filter(d => !S.docAgent || d.agent_id === S.docAgent);
+  const fid = d => known.has(d.folder_id) ? d.folder_id : '';
+  const list = searching ? base.filter(d => match(d.file_name + ' ' + (d.doc_type || '') + ' ' + agentName(d.agent_id) + ' ' + folderName(d.folder_id))) : base.filter(d => fid(d) === inF);
+  const folderCards = (!inF && !searching) ? S.folders.map(x => { const n = base.filter(d => fid(d) === x.id).length;
+    return `<button class="card" onclick="openFolder('${x.id}')"><div class="item" style="padding:0;border:0"><span class="ico" style="--tb:#fff3d6;--tc:#b7791f">${ic('folder', 20)}</span><div class="grow"><b>${esc(x.name)}</b><span class="sub">${n} file${n === 1 ? '' : 's'}</span></div></div></button>`; }).join('') : '';
+  const head = inF
+    ? `<div style="margin-bottom:6px"><button class="btn ghost small" onclick="openFolder('')">‹ All documents</button></div>${pageHead(esc(cur.name), `<button class="btn" onclick="docForm()">+ Upload</button>`)}<div class="toolbar"><button class="btn ghost small" onclick="renameFolder()">Rename folder</button><button class="btn danger small" onclick="delFolder()">Delete folder</button></div>`
+    : pageHead('Documents', `<div class="toolbar" style="margin:0"><button class="btn ghost" onclick="newFolder()">+ New folder</button><button class="btn" onclick="docForm()">+ Upload</button></div>`);
+  const filter = `<div class="filter" style="margin-bottom:12px;max-width:320px"><label>Show documents for</label><select onchange="S.docAgent=this.value;render()"><option value="">Everyone</option>${S.agents.map(a => `<option value="${a.id}" ${S.docAgent === a.id ? 'selected' : ''}>${esc(a.full_name)}</option>`).join('')}</select></div>`;
+  let body = folderCards;
+  if (folderCards && list.length) body += '<p class="sub" style="margin:14px 0 8px">Not in a folder</p>';
+  body += list.map(d => docCard(d, searching)).join('');
+  if (!body) body = `<p class="empty">${searching ? 'No documents match your search.' : inF ? 'This folder is empty. Tap Upload to add files.' : 'No documents yet. Create a folder, then upload contracts, ID copies or bank details.'}</p>`;
+  return head + filter + body;
+}
+const openFolder = id => { S.folder = id; render(); window.scrollTo(0, 0); };
+function newFolder() {
+  openSheet(`<h3>New folder</h3><form onsubmit="saveFolder(event,'')">${fld('name', 'Folder name', '', 'text', 'required placeholder="e.g. Contracts 2026"')}<div class="actions"><button type="button" class="btn ghost" onclick="closeSheet()">Cancel</button><button class="btn">Create folder</button></div></form>`);
+}
+function renameFolder() {
+  const c = S.folders.find(x => x.id === S.folder); if (!c) return;
+  openSheet(`<h3>Rename folder</h3><form onsubmit="saveFolder(event,'${c.id}')">${fld('name', 'Folder name', c.name, 'text', 'required')}<div class="actions"><button type="button" class="btn ghost" onclick="closeSheet()">Cancel</button><button class="btn">Save</button></div></form>`);
+}
+async function saveFolder(e, id) {
+  e.preventDefault(); const name = String(new FormData(e.target).get('name') || '').trim(); if (!name) return;
+  const r = id ? await db.from('doc_folders').update({ name }).eq('id', id) : await db.from('doc_folders').insert({ name });
+  if (r.error) return toast(r.error.code === '23505' ? 'A folder with that name already exists' : r.error.message, true);
+  closeSheet(); toast('Folder saved'); go('documents', true);
+}
+async function delFolder() {
+  const c = S.folders.find(x => x.id === S.folder); if (!c) return;
+  if (!confirm('Delete the folder "' + c.name + '"? Its files are not deleted; they move back to the main list.')) return;
+  const r = await db.from('doc_folders').delete().eq('id', c.id);
+  if (r.error) return toast(r.error.message, true);
+  S.folder = ''; toast('Folder deleted'); go('documents', true);
+}
+function moveDoc(id) {
+  const d = S.docs.find(x => x.id === id);
+  openSheet(`<h3>Move file</h3><p class="muted" style="margin:0">${esc(d.file_name)}</p>
+  <form onsubmit="saveMove(event,'${id}')"><label>Folder</label><select name="folder_id"><option value="">No folder</option>${S.folders.map(f => `<option value="${f.id}" ${d.folder_id === f.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select>
+  <div class="actions"><button type="button" class="btn ghost" onclick="closeSheet()">Cancel</button><button class="btn">Move</button></div></form>`);
+}
+async function saveMove(e, id) {
+  e.preventDefault(); const v = new FormData(e.target).get('folder_id') || null;
+  const r = await db.from('documents').update({ folder_id: v }).eq('id', id);
+  if (r.error) return toast(r.error.message, true);
+  closeSheet(); toast('File moved'); go('documents', true);
 }
 function docForm() {
   openSheet(`<h3>Upload document</h3>
   <form onsubmit="uploadDoc(event)">
+    <label>Folder</label><select name="folder_id"><option value="">No folder</option>${S.folders.map(f => `<option value="${f.id}" ${S.folder === f.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select>
     <label>Agent</label><select name="agent_id">${agentOpts(S.docAgent, 'General (no agent)')}</select>
     <label>Type</label><select name="doc_type">${opts(DOC_TYPES)}</select>
     <label>File</label><input name="file" type="file" required>
@@ -634,7 +689,7 @@ async function uploadDoc(e) {
   const path = `${agent || 'general'}/${Date.now()}-${safeName(file.name)}`;
   const up = await db.storage.from('documents').upload(path, file, { contentType: file.type || undefined });
   if (up.error) { btn.disabled = false; btn.textContent = 'Upload'; return toast(up.error.message, true); }
-  const ins = await db.from('documents').insert({ agent_id: agent, doc_type: f.doc_type.value, file_name: file.name, file_path: path });
+  const ins = await db.from('documents').insert({ agent_id: agent, doc_type: f.doc_type.value, file_name: file.name, file_path: path, folder_id: f.folder_id.value || null });
   if (ins.error) { await db.storage.from('documents').remove([path]); btn.disabled = false; btn.textContent = 'Upload'; return toast(ins.error.message, true); }
   closeSheet(); toast('Document uploaded'); go(S.view, true);
 }
